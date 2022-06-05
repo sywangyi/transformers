@@ -3,10 +3,7 @@ name: Build docker images (scheduled)
 on:
   push:
     branches:
-      - docker-image*
-  repository_dispatch:
-  schedule:
-    - cron: "0 1 * * *"
+      - test_fix_pytorch_version_in_ci
 
 concurrency:
   group: docker-images-builds
@@ -37,7 +34,7 @@ jobs:
           build-args: |
             REF=main
           push: true
-          tags: huggingface/transformers-all-latest-gpu
+          tags: huggingface/transformers-all-latest-gpu-test
 
   latest-torch-deepspeed-docker:
     name: "Latest PyTorch + DeepSpeed"
@@ -63,31 +60,7 @@ jobs:
           build-args: |
             REF=main
           push: true
-          tags: huggingface/transformers-pytorch-deepspeed-latest-gpu
-
-  doc-builder:
-    name: "Doc builder"
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      -
-        name: Check out code
-        uses: actions/checkout@v2
-      -
-        name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      -
-        name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          context: ./docker/transformers-doc-builder
-          push: true
-          tags: huggingface/transformers-doc-builder
+          tags: huggingface/transformers-pytorch-deepspeed-latest-gpu-test
 
   latest-pytorch:
     name: "Latest PyTorch [dev]"
@@ -113,30 +86,4 @@ jobs:
           build-args: |
             REF=main
           push: true
-          tags: huggingface/transformers-pytorch-gpu
-
-  latest-tensorflow:
-    name: "Latest TensorFlow [dev]"
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      -
-        name: Check out code
-        uses: actions/checkout@v2
-      -
-        name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      -
-        name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          context: ./docker/transformers-tensorflow-gpu
-          build-args: |
-            REF=main
-          push: true
-          tags: huggingface/transformers-tensorflow-gpu
+          tags: huggingface/transformers-pytorch-gpu-test
