@@ -3,16 +3,7 @@ name: Self-hosted runner (push)
 on:
   push:
     branches:
-      - push-ci
-      - ci_*
-      - ci-*
-    paths:
-      - "src/**"
-      - "tests/**"
-      - ".github/**"
-      - "templates/**"
-      - "utils/**"
-  repository_dispatch:
+      - test_fix_pytorch_version_in_ci
 
 env:
   HF_HOME: /mnt/cache
@@ -84,7 +75,7 @@ jobs:
         machine_type: [single-gpu]
     runs-on: [self-hosted, docker-gpu, '${{ matrix.machine_type }}']
     container:
-      image: huggingface/transformers-all-latest-gpu
+      image: huggingface/transformers-all-latest-gpu-test
       options: --gpus 0 --shm-size "16gb" --ipc host -v /mnt/cache/.cache/huggingface:/mnt/cache/
     steps:
       - name: Echo folder ${{ matrix.folders }}
@@ -141,7 +132,7 @@ jobs:
         machine_type: [multi-gpu]
     runs-on: [self-hosted, docker-gpu, '${{ matrix.machine_type }}']
     container:
-      image: huggingface/transformers-all-latest-gpu
+      image: huggingface/transformers-all-latest-gpu-test
       options: --gpus all --shm-size "16gb" --ipc host -v /mnt/cache/.cache/huggingface:/mnt/cache/
     steps:
       - name: Echo folder ${{ matrix.folders }}
@@ -198,7 +189,7 @@ jobs:
         machine_type: [single-gpu]
     runs-on: [self-hosted, docker-gpu, '${{ matrix.machine_type }}']
     container:
-      image: huggingface/transformers-pytorch-deepspeed-latest-gpu
+      image: huggingface/transformers-pytorch-deepspeed-latest-gpu-test
       options: --gpus 0 --shm-size "16gb" --ipc host -v /mnt/cache/.cache/huggingface:/mnt/cache/
     steps:
       - name: Update clone
@@ -240,7 +231,7 @@ jobs:
         machine_type: [multi-gpu]
     runs-on: [self-hosted, docker-gpu, '${{ matrix.machine_type }}']
     container:
-      image: huggingface/transformers-pytorch-deepspeed-latest-gpu
+      image: huggingface/transformers-pytorch-deepspeed-latest-gpu-test
       options: --gpus all --shm-size "16gb" --ipc host -v /mnt/cache/.cache/huggingface:/mnt/cache/
     steps:
       - name: Update clone
@@ -292,7 +283,7 @@ jobs:
           CI_SLACK_CHANNEL_ID: ${{ secrets.CI_SLACK_CHANNEL_ID }}
           CI_SLACK_CHANNEL_ID_DAILY: ${{ secrets.CI_SLACK_CHANNEL_ID_DAILY }}
           CI_SLACK_CHANNEL_DUMMY_TESTS: ${{ secrets.CI_SLACK_CHANNEL_DUMMY_TESTS }}
-          CI_SLACK_REPORT_CHANNEL_ID: ${{ secrets.CI_SLACK_CHANNEL_ID }}
+          CI_SLACK_REPORT_CHANNEL_ID: ${{ secrets.CI_SLACK_CHANNEL_DUMMY_TESTS }}
           CI_EVENT: push
           CI_TITLE: ${{ github.event.head_commit.message }}
           CI_COMMIT_URL: ${{ github.event.head_commit.url }}
