@@ -16,6 +16,7 @@ from huggingface_hub import HfApi
 from tqdm import trange
 
 from transformers import (
+    AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     GenerationConfig,
@@ -215,6 +216,10 @@ class BenchmarkRunner:
         )
         self.model = self.model.eval().to(config.device)
 
+        if hasattr(self.model, "_can_set_experts_implementation") and self.model._can_set_experts_implementation():
+            self.logger.info(f"Detected MoE model, setting experts implementation to {config.experts_implementation}")
+            self.model.set_experts_implementation(config.experts_implementation)
+
     def run_benchmark(self, config: BenchmarkConfig, num_tokens_to_profile: int = 0) -> BenchmarkResult | None:
         """Run a single benchmark with the given model ID and config."""
         with torch.no_grad():
@@ -331,6 +336,27 @@ class BenchmarkRunner:
         pretty_print_summary: bool = True,
         summarized: bool = True,
     ) -> tuple[str, dict[str, Any]]:
+        config_obj = AutoConfig.from_pretrained(model_id)
+        is_moe = (
+            getattr(config_obj, "num_local_experts", 0) > 1
+            or getattr(config_obj, "n_routed_experts", 0) > 1
+            or getattr(config_obj, "num_experts", 0) > 1
+        )
+
+        if not is_moe:
+            self.logger.info(f"Model {model_id} is not MoE. Normalizing experts_implementation to 'eager'.")
+            unique_configs = []
+            seen_hashes = set()
+            for config in benchmark_configs:
+                if hasattr(config, "experts_implementation"):
+                    config.experts_implementation = "eager"
+
+                h = config.hash
+                if h not in seen_hashes:
+                    unique_configs.append(config)
+                    seen_hashes.add(h)
+            benchmark_configs = unique_configs
+
         """Run multiple benchmarks for the given model ID and list of benchmark configs."""
         all_results = {}
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -54,6 +54,7 @@ class BenchmarkConfig:
     """Configuration for a single benchmark scenario."""
 
     all_attn_implementations = ["flash_attention_2", "eager", "sdpa", "flex_attention"]
+    all_experts_implementations = ["eager", "batched_mm", "grouped_mm"]
     all_compiled_modes = [None, "default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"]
 
     def __init__(
@@ -66,6 +67,7 @@ class BenchmarkConfig:
         sequence_length: int = 128,
         num_tokens_to_generate: int = 128,
         attn_implementation: str = "eager",
+        experts_implementation: str = "eager",
         compile_kwargs: dict[str, Any] | None = None,
         kernelize: bool = False,
         name: str | None = None,
@@ -245,14 +247,16 @@ def get_config_by_level(level: int) -> list[BenchmarkConfig]:
                 compile_kwargs = {"mode": cm} if cm is not None else None
                 for kernelize_on in {False, KERNELIZATION_AVAILABLE}:
                     for cb_on in [False, True]:
-                        configs.append(
-                            BenchmarkConfig(
-                                attn_implementation=attn_implementation,
-                                compile_kwargs=compile_kwargs,
-                                kernelize=kernelize_on,
-                                continuous_batching=cb_on,
+                        for experts_implementation in BenchmarkConfig.all_experts_implementations:
+                            configs.append(
+                                BenchmarkConfig(
+                                    attn_implementation=attn_implementation,
+                                    compile_kwargs=compile_kwargs,
+                                    kernelize=kernelize_on,
+                                    continuous_batching=cb_on,
+                                    experts_implementation=experts_implementation,
+                                )
                             )
-                        )
         return configs
     # Otherwise, we add the configs for the given level
     if level >= 0:
