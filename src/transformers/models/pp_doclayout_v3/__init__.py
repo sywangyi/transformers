@@ -1,4 +1,4 @@
-# Copyright 2025 The HuggingFace Team. All rights reserved.
+# Copyright 2026 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+
 from typing import TYPE_CHECKING
 
 from ...utils import _LazyModule
@@ -18,12 +20,9 @@ from ...utils.import_utils import define_import_structure
 
 
 if TYPE_CHECKING:
-    from .configuration_siglip2 import *
-    from .image_processing_siglip2 import *
-    from .image_processing_siglip2_fast import *
-    from .modeling_siglip2 import *
-    from .processing_siglip2 import *
-    from .tokenization_siglip2 import *
+    from .configuration_pp_doclayout_v3 import *
+    from .image_processing_pp_doclayout_v3_fast import *
+    from .modeling_pp_doclayout_v3 import *
 else:
     import sys
 
