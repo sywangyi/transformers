@@ -212,8 +212,9 @@ class BenchmarkRunner:
             attn_implementation=config.attn_implementation,
             generation_config=generation_config,
             use_kernels=use_kernels,
+            device_map=config.device,
         )
-        self.model = self.model.eval().to(config.device)
+        self.model = self.model.eval()
 
     def run_benchmark(self, config: BenchmarkConfig, num_tokens_to_profile: int = 0) -> BenchmarkResult | None:
         """Run a single benchmark with the given model ID and config."""
