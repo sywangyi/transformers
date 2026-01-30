@@ -91,6 +91,7 @@ class BenchmarkConfig:
             compile_kwargs["fullgraph"] = compile_kwargs.get("fullgraph", True)
             self.compile_config = CompileConfig(**compile_kwargs)
         self.kernelize = kernelize
+        self.experts_implementation = experts_implementation
         # Constant parameters
         self.dtype = "torch.bfloat16"
         self.device = torch.accelerator.current_accelerator().type if is_torch_accelerator_available() else "cuda"
@@ -150,6 +151,7 @@ class BenchmarkConfig:
             attn_code = self.attn_implementation
             compile_str = f"compiled_{self.compile_config.mode}" if self.compile_config is not None else "uncompiled"
             kernelize_str = "kernelized" if self.kernelize else "unkernelized"
+            experts_str = f"experts_{self.experts_implementation}"
             continuous_batching_str = "cb" if self.continuous_batching else "generate"
             sep = "-"
         else:
@@ -159,10 +161,11 @@ class BenchmarkConfig:
             attn_code = f"{self.attn_implementation} attention"
             compile_str = "compiled" if self.compile_config is not None else "not compiled"
             kernelize_str = "kernelized" if self.kernelize else "not kernelized"
+            experts_str = f"experts_{self.experts_implementation}"
             continuous_batching_str = "continuous batching" if self.continuous_batching else "regular generate"
             sep = ", "
         return sep.join(
-            [iter_str, gpu_monitor_str, dimensions_str, attn_code, compile_str, kernelize_str, continuous_batching_str]
+            [iter_str, gpu_monitor_str, dimensions_str, attn_code, compile_str, kernelize_str, experts_str, continuous_batching_str]
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -178,6 +181,7 @@ class BenchmarkConfig:
             "attn_implementation": self.attn_implementation,
             "compile_kwargs": self.compile_config.to_dict() if self.compile_config is not None else None,
             "kernelize": self.kernelize,
+            "experts_implementation": self.experts_implementation,
         }
 
     @classmethod
@@ -193,6 +197,7 @@ class BenchmarkConfig:
             attn_implementation=data.get("attn_implementation", "eager"),
             compile_kwargs=data.get("compile_kwargs"),
             kernelize=data.get("kernelize", False),
+            experts_implementation=data.get("experts_implementation", "eager"),
             name=data.get("name"),
             skip_validity_check=skip_validity_check,
         )
@@ -260,7 +265,17 @@ def get_config_by_level(level: int) -> list[BenchmarkConfig]:
         return configs
     # Otherwise, we add the configs for the given level
     if level >= 0:
-        configs.append(BenchmarkConfig(attn_implementation="flex_attention", compile_kwargs={}))
+        configs.append(BenchmarkConfig(attn_implementation="sdpa", compile_kwargs={}))
+        for experts_implementation in BenchmarkConfig.all_experts_implementations:
+            configs.append(
+                BenchmarkConfig(
+                    attn_implementation=attn_implementation,
+                    compile_kwargs=compile_kwargs,
+                    kernelize=kernelize_on,
+                    continuous_batching=cb_on,
+                    experts_implementation=experts_implementation,
+                )
+            )
     if level >= 1:
         configs.append(BenchmarkConfig(attn_implementation="flash_attention_2"))
         configs.append(BenchmarkConfig(attn_implementation="eager", compile_kwargs={}))
