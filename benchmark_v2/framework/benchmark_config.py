@@ -69,6 +69,7 @@ class BenchmarkConfig:
         attn_implementation: str = "eager",
         compile_kwargs: dict[str, Any] | None = None,
         kernelize: bool = False,
+        tp_plan: str | dict[str, str] | None = None,
         name: str | None = None,
         skip_validity_check: bool = False,
     ) -> None:
@@ -83,6 +84,7 @@ class BenchmarkConfig:
         self.num_tokens_to_generate = num_tokens_to_generate
         # Generation parameters
         self.attn_implementation = attn_implementation
+        self.tp_plan = tp_plan
         # Optimization parameters
         if compile_kwargs is None:
             self.compile_config = None
@@ -100,7 +102,6 @@ class BenchmarkConfig:
     def check_validity(self, skip_validity_check: bool = False) -> None:
         if skip_validity_check:
             return
-
         # If flash_attention_2 is selected but not available, default to SDPA
         if self.attn_implementation == "flash_attention_2" and not is_fa2_or_kernel_available():
             logger.error("Flash attention is not available. Defaulting to SDPA.")
@@ -142,6 +143,9 @@ class BenchmarkConfig:
 
     def infer_name(self, compact: bool = True) -> str:
         """Infer a human-readable name for the benchmark config, either compact or verbose."""
+        tp_str = "no_tp"
+        if self.tp_plan is not None:
+            tp_str = f"tp_{self.tp_plan}"
         if compact:
             iter_str = f"w{self.warmup_iterations}_i{self.measurement_iterations}"
             gpu_monitor_str = "monitored" if self.gpu_monitoring else "unmonitored"
@@ -161,7 +165,16 @@ class BenchmarkConfig:
             continuous_batching_str = "continuous batching" if self.continuous_batching else "regular generate"
             sep = ", "
         return sep.join(
-            [iter_str, gpu_monitor_str, dimensions_str, attn_code, compile_str, kernelize_str, continuous_batching_str]
+            [
+                iter_str,
+                gpu_monitor_str,
+                dimensions_str,
+                attn_code,
+                compile_str,
+                kernelize_str,
+                continuous_batching_str,
+                tp_str,
+            ]
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -177,6 +190,7 @@ class BenchmarkConfig:
             "attn_implementation": self.attn_implementation,
             "compile_kwargs": self.compile_config.to_dict() if self.compile_config is not None else None,
             "kernelize": self.kernelize,
+            "tp_plan": self.tp_plan,
         }
 
     @classmethod
@@ -192,6 +206,7 @@ class BenchmarkConfig:
             attn_implementation=data.get("attn_implementation", "eager"),
             compile_kwargs=data.get("compile_kwargs"),
             kernelize=data.get("kernelize", False),
+            tp_plan=data.get("tp_plan"),
             name=data.get("name"),
             skip_validity_check=skip_validity_check,
         )
