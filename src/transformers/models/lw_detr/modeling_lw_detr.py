@@ -30,6 +30,7 @@ from torch import Tensor, nn
 
 from ... import initialization as init
 from ...activations import ACT2CLS, ACT2FN
+from ...backbone_utils import BackboneMixin
 from ...integrations import use_kernel_forward_from_hub
 from ...modeling_layers import GradientCheckpointingLayer
 from ...modeling_outputs import BackboneOutput, BaseModelOutputWithCrossAttentions
@@ -37,8 +38,7 @@ from ...modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from ...processing_utils import Unpack
 from ...pytorch_utils import meshgrid
 from ...utils import ModelOutput, TransformersKwargs, auto_docstring, torch_compilable_check
-from ...utils.backbone_utils import BackboneMixin
-from ...utils.generic import check_model_inputs
+from ...utils.generic import can_return_tuple, check_model_inputs
 from .configuration_lw_detr import LwDetrConfig, LwDetrViTConfig
 
 
@@ -367,10 +367,9 @@ class LwDetrViTPreTrainedModel(PreTrainedModel):
 
 
 @auto_docstring()
-class LwDetrViTBackbone(LwDetrViTPreTrainedModel, BackboneMixin):
+class LwDetrViTBackbone(BackboneMixin, LwDetrViTPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
-        super()._init_backbone(config)
 
         self.embeddings = LwDetrViTEmbeddings(config)
         self.encoder = LwDetrViTEncoder(config)
@@ -1121,6 +1120,7 @@ class LwDetrDecoder(LwDetrPreTrainedModel):
         query_pos = self.ref_point_head(query_sine_embed)
         return reference_points_inputs, query_pos
 
+    @check_model_inputs
     def forward(
         self,
         inputs_embeds: torch.Tensor | None = None,
@@ -1195,6 +1195,9 @@ class LwDetrModelOutput(ModelOutput):
     intermediate_reference_points: torch.FloatTensor | None = None
     enc_outputs_class: torch.FloatTensor | None = None
     enc_outputs_coord_logits: torch.FloatTensor | None = None
+    hidden_states: tuple[torch.FloatTensor, ...] | None = None
+    attentions: tuple[torch.FloatTensor, ...] | None = None
+    cross_attentions: tuple[torch.FloatTensor, ...] | None = None
 
 
 def refine_bboxes(reference_points, deltas):
@@ -1336,7 +1339,7 @@ class LwDetrModel(LwDetrPreTrainedModel):
         object_query = object_query.masked_fill(~output_proposals_valid, float(0))
         return object_query, output_proposals
 
-    @check_model_inputs
+    @can_return_tuple
     @auto_docstring
     def forward(
         self,
@@ -1479,6 +1482,9 @@ class LwDetrModel(LwDetrPreTrainedModel):
             intermediate_reference_points=decoder_outputs.intermediate_reference_points,
             enc_outputs_class=enc_outputs_class,
             enc_outputs_coord_logits=enc_outputs_coord_logits,
+            hidden_states=decoder_outputs.hidden_states,
+            attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
         )
 
 
@@ -1551,6 +1557,9 @@ class LwDetrObjectDetectionOutput(ModelOutput):
     intermediate_reference_points: torch.FloatTensor | None = None
     enc_outputs_class: Any = None
     enc_outputs_coord_logits: torch.FloatTensor | None = None
+    hidden_states: tuple[torch.FloatTensor, ...] | None = None
+    attentions: tuple[torch.FloatTensor, ...] | None = None
+    cross_attentions: tuple[torch.FloatTensor, ...] | None = None
 
 
 @auto_docstring(
@@ -1573,7 +1582,7 @@ class LwDetrForObjectDetection(LwDetrPreTrainedModel):
 
         self.post_init()
 
-    @check_model_inputs
+    @can_return_tuple
     @auto_docstring
     def forward(
         self,
@@ -1686,6 +1695,9 @@ class LwDetrForObjectDetection(LwDetrPreTrainedModel):
             init_reference_points=outputs.init_reference_points,
             enc_outputs_class=enc_outputs_class_logits,
             enc_outputs_coord_logits=enc_outputs_boxes_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
         )
 
 
