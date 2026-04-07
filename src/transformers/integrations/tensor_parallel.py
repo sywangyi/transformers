@@ -1083,7 +1083,6 @@ class GroupedGemmParallel(TensorParallelLayer):
                 module._num_experts_sharded = True
 
 
-
 class RouterParallel(TensorParallelLayer):
     """
     Allows to reshape the router scores to support running expert parallel.
@@ -1135,9 +1134,7 @@ class RouterParallel(TensorParallelLayer):
         if num_experts is None:
             num_experts = getattr(getattr(mod, "config", None), "num_experts", None)
         if num_experts is None:
-            raise AttributeError(
-                f"Router module {type(mod).__name__} is missing num_experts and config.num_experts"
-            )
+            raise AttributeError(f"Router module {type(mod).__name__} is missing num_experts and config.num_experts")
 
         if num_experts % ep_size != 0:
             raise ValueError(
