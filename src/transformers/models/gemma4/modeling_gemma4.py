@@ -1351,6 +1351,30 @@ class Gemma4TextDecoderLayer(GradientCheckpointingLayer):
             self.post_feedforward_layernorm_2 = Gemma4RMSNorm(self.hidden_size, eps=config.rms_norm_eps)
             self.pre_feedforward_layernorm_2 = Gemma4RMSNorm(self.hidden_size, eps=config.rms_norm_eps)
 
+    def _project_router_outputs_for_local_experts(self, router_scores, router_indices):
+        """
+        Project router outputs (global) to local expert routing.
+
+        Args:
+            router_scores: [seq_len, num_local_experts] dense router scores
+            router_indices: [seq_len, top_k] indices with sentinels (num_local_experts marks invalid routes)
+
+        Returns:
+            (local_weights, local_indices) with zeros for non-local routes
+        """
+        num_local_experts = self.config.num_local_experts
+
+        # Identify local expert routes (using sentinel value)
+        is_local = router_indices != num_local_experts
+
+        # Project indices to local expert space, mask invalid ones
+        local_indices = router_indices.masked_fill(~is_local, 0)
+
+        # Gather weights for selected experts, mask invalid ones
+        local_weights = router_scores.gather(1, local_indices).masked_fill(~is_local, 0.0)
+
+        return local_weights, local_indices
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -1386,7 +1410,8 @@ class Gemma4TextDecoderLayer(GradientCheckpointingLayer):
 
             # Take hidden states before MLP here
             hidden_states_flat = residual.reshape(-1, residual.shape[-1])
-            _, top_k_weights, top_k_index = self.router(hidden_states_flat)
+            _, router_scores, top_k_index = self.router(hidden_states_flat)
+            top_k_weights, top_k_index = self._project_router_outputs_for_local_experts(router_scores, top_k_index)
             hidden_states_2 = self.pre_feedforward_layernorm_2(hidden_states_flat)
             hidden_states_2 = self.experts(hidden_states_2, top_k_index, top_k_weights)
             hidden_states_2 = hidden_states_2.reshape(residual.shape)

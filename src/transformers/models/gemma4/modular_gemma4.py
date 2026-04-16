@@ -1085,6 +1085,29 @@ class Gemma4TextDecoderLayer(Gemma3DecoderLayer):
             self.post_feedforward_layernorm_2 = Gemma4RMSNorm(self.hidden_size, eps=config.rms_norm_eps)
             self.pre_feedforward_layernorm_2 = Gemma4RMSNorm(self.hidden_size, eps=config.rms_norm_eps)
 
+    def _project_router_outputs_for_local_experts(
+        self, router_scores: torch.Tensor, router_indices: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Convert EP router outputs to top-k aligned local (weights, indices).
+
+        With generic `ep_router`, `router_scores` is dense over local experts
+        `[tokens, num_local_experts]` while `router_indices` is `[tokens, top_k]`
+        with sentinel `num_local_experts` for non-local routes.
+        """
+        num_local_experts = self.experts.num_experts
+        requires_projection = (
+            router_scores.shape[-1] != router_indices.shape[-1]
+            or torch.any(router_indices == num_local_experts)
+        )
+        if not requires_projection:
+            return router_scores, router_indices
+
+        is_local = router_indices != num_local_experts
+        local_indices = router_indices.masked_fill(~is_local, 0)
+        local_weights = router_scores.gather(1, local_indices).masked_fill(~is_local, 0.0)
+        return local_weights, local_indices
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -1120,7 +1143,8 @@ class Gemma4TextDecoderLayer(Gemma3DecoderLayer):
 
             # Take hidden states before MLP here
             hidden_states_flat = residual.reshape(-1, residual.shape[-1])
-            _, top_k_weights, top_k_index = self.router(hidden_states_flat)
+            _, router_scores, top_k_index = self.router(hidden_states_flat)
+            top_k_weights, top_k_index = self._project_router_outputs_for_local_experts(router_scores, top_k_index)
             hidden_states_2 = self.pre_feedforward_layernorm_2(hidden_states_flat)
             hidden_states_2 = self.experts(hidden_states_2, top_k_index, top_k_weights)
             hidden_states_2 = hidden_states_2.reshape(residual.shape)

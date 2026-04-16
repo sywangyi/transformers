@@ -1143,24 +1143,6 @@ class RouterParallel(TensorParallelLayer):
         num_local_experts = num_experts // ep_size
         router_logits, router_scores, router_indices = outputs
 
-        # Gemma4 expects top-k aligned routing tensors [tokens, top_k] for
-        # (weights, indices). Keep only local experts on this rank and convert
-        # global indices to local indices, using sentinel=num_local_experts.
-        model_type = getattr(getattr(mod, "config", None), "model_type", None)
-        if model_type == "gemma4_text":
-            is_local = (router_indices // num_local_experts) == ep_rank
-            local_weights = router_scores.masked_fill(~is_local, 0.0)
-
-            if num_local_experts > 1:
-                local_indices = torch.remainder(router_indices, num_local_experts)
-            else:
-                local_indices = torch.zeros_like(router_indices)
-
-            # Keep indices within [0, num_local_experts) and use zero-weight masking
-            # for non-local routes. This avoids out-of-range one_hot in expert modules.
-            local_indices = local_indices.masked_fill(~is_local, 0)
-            return router_logits, local_weights, local_indices
-
         router_scores = torch.zeros_like(router_logits).scatter_(1, router_indices, router_scores)
         router_scores = router_scores[:, ep_rank * num_local_experts : (ep_rank + 1) * num_local_experts]
         router_indices = router_indices.masked_fill((router_indices // num_local_experts) != ep_rank, -1)
